@@ -6,6 +6,8 @@ Product: Personal Finance App · Version 1.0 · April 2026 · PM Portfolio Docum
 
 Right now, we know that around 76% of Americans live paycheck-to-paycheck, only 46% of Americans have just enough emergency savings to cover just 3 months of expenses. And nearly 40% of Americans have less than $500 in cash savings.
 
+![Problem overview](images1/image1.png)
+
 Millions of everyday people across income levels live paycheck to paycheck — not because they don't earn enough, but because they lack a simple, unified tool to understand their money, control their spending, and start building savings. Existing financial apps are either too complex for non-experts, too narrow in scope, or does not recommend the steps of action to be taken by general users. The result: people feel anxious about money, avoid thinking about it, and never make enough savings and mindset of savings.
 
 ## 2. Target audience
@@ -69,6 +71,12 @@ We'll know it's working when:
 
 Most people I spoke didn't have clear idea on how to start saving. They were confused, agitated, and felt stuck and guilty that they feel trapped.
 
+![User persona diagram 1](images1/image2.png)
+
+![User persona diagram 2](images1/image3.png)
+
+![User persona diagram 3](images1/image4.png)
+
 So with above interviews and cards, I will keep in mind to make app that is savings focused and has visuals and easy to use, use clear wording no/less finance jargons, integrate venmo and apple pay. Also provide HYSA which gives good return on their savings.
 
 ---
@@ -78,9 +86,19 @@ So with above interviews and cards, I will keep in mind to make app that is savi
 - As Aisha, I want a jargon free app, so that I don't feel overwhelmed when I first use it.
 - As Diana, I want a recommendation tips every time I open my account about saving my money.
 
+![User story 1](images1/image5.png)
+
+![User story 2](images1/image6.png)
+
+![User story 3](images1/image7.png)
+
+![User story 4](images1/image8.png)
+
 ---
 
 ## Phase 4 – Prioritization
+
+![Prioritization diagram](images1/image9.png)
 
 | User Story | Priority | Rationale |
 | --- | --- | --- |
@@ -99,6 +117,8 @@ So with above interviews and cards, I will keep in mind to make app that is savi
 ---
 
 ## Phase 5 – Product Roadmap
+
+![Product roadmap](images1/image10.png)
 
 Here, we have defined what user story to start with when it starts and how long will it take to complete. It's a strategy plan rather than just a to-do list.
 
