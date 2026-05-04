@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Smart Money Allocator v2</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --sage:#1D9E75;--sage-light:#5DCAA5;--sage-muted:#E1F5EE;
+    --gold:#BA7517;--gold-light:#EF9F27;--gold-muted:#FAEEDA;
+    --blue:#185FA5;--blue-light:#378ADD;--blue-muted:#E6F1FB;
+    --red:#A32D2D;--red-light:#E24B4A;--red-muted:#FCEBEB;
+    --ink:#1a1a1a;--muted:#6b7280;--subtle:#9ca3af;
+    --bg:#faf9f7;--card:#ffffff;--border:#e5e0d8;--border2:#d1ccc4;
+    --radius:12px;--radius-sm:8px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
+  }
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem 4rem}
+  h1{font-size:28px;font-weight:700;letter-spacing:-0.8px;margin-bottom:4px;text-align:center}
+  .hero-sub{font-size:15px;color:var(--muted);text-align:center;margin-bottom:2.5rem}
+  .v-tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:#1a1a1a;color:#fff;letter-spacing:0.5px;vertical-align:middle;margin-left:8px;position:relative;top:-3px}
+  .app{width:100%;max-width:580px}
+
+  /* Cards */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1rem}
+  .card-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:1.25rem;display:flex;align-items:center;gap:8px}
+  .step-num{width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .field-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--subtle);margin-bottom:8px}
+
+  /* Amount inputs */
+  .amt-row{display:flex;align-items:center;gap:6px;border:1.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 14px;transition:border-color 0.15s;background:#fff}
+  .amt-row:focus-within{border-color:var(--sage)}
+  .amt-row.warn:focus-within{border-color:var(--red-light)}
+  .currency{font-size:22px;font-weight:700;color:var(--muted)}
+  .amt-row input{font-size:22px;font-weight:700;border:none;outline:none;width:100%;background:transparent;color:var(--ink);letter-spacing:-0.5px}
+  .amt-row input::placeholder{color:#d1ccc4}
+
+  /* Two-col inputs */
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:0}
+
+  /* Live leftover pill */
+  .leftover-bar{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-top:12px}
+  .leftover-label{font-size:12px;color:var(--muted);font-weight:500}
+  .leftover-val{font-size:16px;font-weight:800;letter-spacing:-0.5px}
+  .leftover-val.positive{color:var(--sage)}
+  .leftover-val.negative{color:var(--red-light)}
+  .leftover-val.zero{color:var(--muted)}
+  .leftover-warn{font-size:11px;color:var(--red-light);margin-top:6px;display:none}
+
+  /* Savings rate chip */
+  .rate-chip{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:var(--sage-muted);color:#085041}
+  .rate-chip.low{background:#FAEEDA;color:#633806}
+  .rate-chip.negative{background:var(--red-muted);color:var(--red)}
+
+  .divider{height:1px;background:var(--border);margin:1.25rem 0}
+
+  /* Risk buttons */
+  .risk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .rbtn{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 8px;background:#fff;cursor:pointer;text-align:center;transition:all 0.15s;user-select:none}
+  .rbtn:hover{border-color:var(--border2);background:#faf9f7}
+  .rbtn.sel-conservative{border-color:var(--sage);background:var(--sage-muted)}
+  .rbtn.sel-moderate{border-color:var(--blue-light);background:var(--blue-muted)}
+  .rbtn.sel-aggressive{border-color:var(--gold-light);background:var(--gold-muted)}
+  .rbtn-icon{font-size:20px;margin-bottom:5px}
+  .rbtn-name{font-size:13px;font-weight:600;color:var(--ink)}
+  .rbtn-desc{font-size:11px;color:var(--muted);margin-top:2px}
+
+  /* CTA */
+  #go-btn{width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.15s;margin-top:1rem;letter-spacing:-0.2px}
+  #go-btn:hover{opacity:0.85}
+  #go-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+  /* Results */
+  #results{display:none;margin-top:0.5rem}
+
+  /* Snapshot — 3 cols */
+  .snapshot{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem}
+  .snap-card{border-radius:var(--radius-sm);padding:0.875rem 1rem;border:1px solid transparent;text-align:center}
+  .snap-card.income{background:#F1EFE8;border-color:#D3D1C7}
+  .snap-card.spend{background:var(--red-muted);border-color:#F7C1C1}
+  .snap-card.left{background:var(--sage-muted);border-color:#9FE1CB}
+  .snap-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px}
+  .snap-lbl.income{color:#5F5E5A}
+  .snap-lbl.spend{color:var(--red)}
+  .snap-lbl.left{color:#085041}
+  .snap-val{font-size:18px;font-weight:800;letter-spacing:-0.5px}
+  .snap-val.income{color:#2C2C2A}
+  .snap-val.spend{color:var(--red-light)}
+  .snap-val.left{color:#085041}
+  .snap-sub{font-size:11px;margin-top:3px}
+  .snap-sub.income{color:#888780}
+  .snap-sub.spend{color:#A32D2D}
+  .snap-sub.left{color:#0F6E56}
+
+  /* Results header */
+  .res-header{display:flex;align-items:center;gap:10px;margin-bottom:1rem}
+  .res-title{font-size:18px;font-weight:700;letter-spacing:-0.5px}
+  .badge{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;letter-spacing:0.3px}
+  .badge-conservative{background:var(--sage-muted);color:#085041}
+  .badge-moderate{background:var(--blue-muted);color:#0C447C}
+  .badge-aggressive{background:var(--gold-muted);color:#633806}
+
+  /* Split */
+  .split-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+  .split-card{border-radius:var(--radius-sm);padding:1rem 1.25rem;border:1px solid transparent}
+  .split-card.bank{background:var(--sage-muted);border-color:#9FE1CB}
+  .split-card.invest{background:var(--gold-muted);border-color:#FAC775}
+  .split-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .split-label.bank{color:#0F6E56}
+  .split-label.invest{color:#854F0B}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .dot-spend{background:var(--red-light)}
+  .dot-bank{background:#1D9E75}
+  .dot-invest{background:#EF9F27}
+  .split-pct{font-size:24px;font-weight:800;letter-spacing:-1px}
+  .split-pct.bank{color:#085041}
+  .split-pct.invest{color:#633806}
+  .split-amt{font-size:13px;margin-top:2px}
+  .split-amt.bank{color:#0F6E56}
+  .split-amt.invest{color:#854F0B}
+
+  /* 3-segment bar */
+  .bar-wrap{margin:0.5rem 0 1.5rem}
+  .bar-track{height:10px;border-radius:5px;overflow:hidden;display:flex;background:#eee}
+  .bar-s{height:100%;background:var(--red-light);transition:width 0.6s ease}
+  .bar-b{height:100%;background:var(--sage);transition:width 0.6s ease}
+  .bar-i{height:100%;background:var(--gold-light);transition:width 0.6s ease}
+  .bar-leg{display:flex;gap:14px;margin-top:6px;flex-wrap:wrap}
+  .leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+
+  /* Sections */
+  .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
+  .sec-head{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:1rem;display:flex;align-items:center;gap:6px}
+  .sec-head.bank{color:#085041}
+  .sec-head.invest{color:#633806}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0ede8}
+  .row:last-child{border-bottom:none;padding-bottom:0}
+  .rname{font-size:14px;font-weight:600;color:var(--ink)}
+  .rwhy{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;max-width:300px}
+  .row-right{text-align:right;flex-shrink:0;padding-left:12px}
+  .ramt{font-size:14px;font-weight:700;color:var(--ink)}
+  .rpct{font-size:11px;color:var(--subtle);margin-top:2px}
+
+  /* Tip */
+  .tip{background:#faf9f7;border:1px solid var(--border);border-left:3px solid var(--sage);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:1rem;font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:1rem}
+  .tip strong{color:var(--ink);font-weight:600}
+
+  /* Summary */
+  .summary-bar{font-size:13px;color:var(--muted);text-align:center;padding:0.75rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:1rem;line-height:1.5}
+
+  /* Savings score */
+  .score-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px;display:flex;align-items:center;gap:16px}
+  .score-ring{width:56px;height:56px;flex-shrink:0}
+  .score-info{}
+  .score-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--subtle);margin-bottom:4px}
+  .score-val{font-size:20px;font-weight:800;letter-spacing:-0.5px}
+  .score-val.great{color:var(--sage)}
+  .score-val.ok{color:var(--gold)}
+  .score-val.low{color:var(--red-light)}
+  .score-desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4}
+
+  /* Reset */
+  #reset-btn{width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;cursor:pointer;transition:all 0.15s;margin-top:4px}
+  #reset-btn:hover{background:var(--card);border-color:var(--border2);color:var(--ink)}
+
+  .disclaimer{font-size:11px;color:var(--subtle);text-align:center;margin-top:2rem;line-height:1.6;max-width:500px}
+
+  @media(max-width:480px){
+    h1{font-size:22px}
+    .two-col{grid-template-columns:1fr}
+    .snapshot{grid-template-columns:1fr 1fr;gap:8px}
+    .snapshot .snap-card:last-child{grid-column:span 2}
+    .split-pct{font-size:20px}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <h1>Smart Money Allocator <span class="v-tag">v2</span></h1>
+  <p class="hero-sub">Income minus spending = what you allocate. We'll show you exactly where it goes.</p>
+
+  <div id="input-section">
+
+    <!-- Step 1: Income & Spending -->
+    <div class="card">
+      <div class="card-title"><span class="step-num">1</span> Your monthly income & spending</div>
+
+      <div class="two-col">
+        <div>
+          <div class="field-label">Monthly income</div>
+          <div class="amt-row" id="income-wrap">
+            <span class="currency">$</span>
+            <input type="number" id="income" placeholder="6,000" min="0" step="any" oninput="updateLeftover()" />
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Monthly spending</div>
+          <div class="amt-row" id="spend-wrap">
+            <span class="currency">$</span>
+            <input type="number" id="spend" placeholder="3,500" min="0" step="any" oninput="updateLeftover()" />
+          </div>
+        </div>
+      </div>
+
+      <div class="leftover-bar" id="leftover-bar">
+        <span class="leftover-label">💰 Available to allocate</span>
+        <span class="leftover-val zero" id="leftover-val">—</span>
+      </div>
+      <div class="leftover-warn" id="leftover-warn">⚠️ Your spending exceeds your income. Please review your numbers.</div>
+    </div>
+
+    <!-- Step 2: Risk -->
+    <div class="card">
+      <div class="card-title"><span class="step-num">2</span> Your risk comfort level</div>
+      <div class="risk-grid">
+        <button class="rbtn" data-risk="conservative" onclick="selectRisk(this)">
+          <div class="rbtn-icon">🏛️</div>
+          <div class="rbtn-name">Conservative</div>
+          <div class="rbtn-desc">Preserve capital</div>
+        </button>
+        <button class="rbtn sel-moderate" data-risk="moderate" onclick="selectRisk(this)">
+          <div class="rbtn-icon">⚖️</div>
+          <div class="rbtn-name">Moderate</div>
+          <div class="rbtn-desc">Balanced growth</div>
+        </button>
+        <button class="rbtn" data-risk="aggressive" onclick="selectRisk(this)">
+          <div class="rbtn-icon">🚀</div>
+          <div class="rbtn-name">Aggressive</div>
+          <div class="rbtn-desc">Maximize returns</div>
+        </button>
+      </div>
+      <button id="go-btn" onclick="generate()">Generate my plan →</button>
+    </div>
+
+  </div>
+
+  <div id="results"></div>
+
+  <p class="disclaimer">For educational purposes only. This is not financial advice. Please consult a licensed financial advisor before making investment decisions.</p>
+</div>
+
+<script>
+  let risk = 'moderate';
+
+  function selectRisk(btn) {
+    document.querySelectorAll('.rbtn').forEach(b => b.className = 'rbtn');
+    btn.classList.add('sel-' + btn.dataset.risk);
+    risk = btn.dataset.risk;
+  }
+
+  function getLeftover() {
+    const inc = parseFloat(document.getElementById('income').value) || 0;
+    const sp = parseFloat(document.getElementById('spend').value) || 0;
+    return { inc, sp, left: inc - sp };
+  }
+
+  function updateLeftover() {
+    const { inc, sp, left } = getLeftover();
+    const valEl = document.getElementById('leftover-val');
+    const warnEl = document.getElementById('leftover-warn');
+    const spendWrap = document.getElementById('spend-wrap');
+
+    if (!inc && !sp) {
+      valEl.textContent = '—';
+      valEl.className = 'leftover-val zero';
+      warnEl.style.display = 'none';
+      spendWrap.classList.remove('warn');
+      return;
+    }
+
+    valEl.textContent = '$' + Math.round(Math.abs(left)).toLocaleString() + (left < 0 ? ' over' : '');
+    if (left > 0) {
+      valEl.className = 'leftover-val positive';
+      warnEl.style.display = 'none';
+      spendWrap.classList.remove('warn');
+    } else if (left === 0) {
+      valEl.className = 'leftover-val zero';
+      warnEl.style.display = 'none';
+      spendWrap.classList.remove('warn');
+    } else {
+      valEl.className = 'leftover-val negative';
+      warnEl.style.display = 'block';
+      spendWrap.classList.add('warn');
+    }
+  }
+
+  const PROFILES = {
+    conservative: {
+      bankPct: 65, investPct: 35,
+      summary: "Capital preservation first. Most of your leftover goes into safe, liquid accounts earning solid interest — with a modest slice for long-term growth.",
+      bankItems: [
+        { name: "High-yield savings account (HYSA)", pct: 35, why: "Liquid emergency fund earning 4.5–5% APY — zero market risk" },
+        { name: "12-month CD", pct: 20, why: "Locks in 5%+ APY for money you won't touch this year" },
+        { name: "Checking buffer", pct: 10, why: "4–6 weeks of expenses — prevents dipping into savings" },
+      ],
+      investItems: [
+        { name: "Total bond market ETF (BND / AGG)", pct: 15, why: "Stable income, low volatility — cushions market swings" },
+        { name: "S&P 500 index fund (VOO)", pct: 15, why: "Broad market exposure with long-term growth at low cost" },
+        { name: "Dividend ETF (SCHD / VYM)", pct: 5, why: "Steady dividend income from blue-chip companies" },
+      ],
+      tip: "<strong>Pro tip:</strong> Shop HYSA rates across Marcus, Ally, and SoFi — they often lead. Check local credit unions for CD rates too; they frequently beat big banks.",
+      badge: "badge-conservative",
+      savingsRating: (pct) => pct >= 20 ? 'great' : pct >= 10 ? 'ok' : 'low'
+    },
+    moderate: {
+      bankPct: 40, investPct: 60,
+      summary: "A balanced approach — enough cash to stay secure and flexible, with a meaningful investment share to grow your wealth steadily over time.",
+      bankItems: [
+        { name: "High-yield savings account (HYSA)", pct: 25, why: "3–6 month emergency fund earning 4.5%+ APY" },
+        { name: "Checking buffer", pct: 10, why: "Keeps day-to-day spending separate from savings" },
+        { name: "6-month CD", pct: 5, why: "Slightly better yield on money you won't need soon" },
+      ],
+      investItems: [
+        { name: "S&P 500 index fund (VOO / FXAIX)", pct: 25, why: "Core holding — broad market, ~10% historical annual return" },
+        { name: "International ETF (VXUS / VEA)", pct: 15, why: "Geographic diversification reduces single-country risk" },
+        { name: "Bond ETF (BND)", pct: 10, why: "Ballast for volatility — smooths downturns in your portfolio" },
+        { name: "Growth ETF (QQQ / VUG)", pct: 10, why: "Tech-tilted upside for the long-term portion" },
+      ],
+      tip: "<strong>Pro tip:</strong> Open a Roth IRA before a taxable brokerage — investments grow 100% tax-free inside it. The 2025 contribution limit is $7,000/year.",
+      badge: "badge-moderate",
+      savingsRating: (pct) => pct >= 20 ? 'great' : pct >= 10 ? 'ok' : 'low'
+    },
+    aggressive: {
+      bankPct: 20, investPct: 80,
+      summary: "Your money works hardest here. A lean cash buffer keeps you liquid, while the bulk is deployed into high-growth investments.",
+      bankItems: [
+        { name: "High-yield savings account (HYSA)", pct: 15, why: "Lean emergency fund — liquid, earning 4.5%+ APY" },
+        { name: "Checking buffer", pct: 5, why: "Minimal cash for near-term expenses only" },
+      ],
+      investItems: [
+        { name: "S&P 500 index fund (VOO / FXAIX)", pct: 32, why: "Core foundation — reliable broad-market growth" },
+        { name: "Growth ETF (QQQ / VUG)", pct: 20, why: "Tech-heavy upside — higher volatility, higher ceiling" },
+        { name: "Individual growth stocks", pct: 16, why: "4–6 high-conviction picks; cap each at 4–5% of portfolio" },
+        { name: "Crypto (BTC / ETH only)", pct: 12, why: "Speculative position — only invest what you can lose" },
+      ],
+      tip: "<strong>Pro tip:</strong> Max your Roth IRA before a taxable brokerage. Aggressive growth compounds fastest — having it tax-free is a massive long-term advantage.",
+      badge: "badge-aggressive",
+      savingsRating: (pct) => pct >= 20 ? 'great' : pct >= 10 ? 'ok' : 'low'
+    }
+  };
+
+  function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
+  function pctOf(part, whole) { return whole > 0 ? Math.round((part / whole) * 100) : 0; }
+
+  function savingsScore(savingsPct) {
+    if (savingsPct >= 30) return { label: 'Excellent saver', desc: 'You\'re saving over 30% of income — well above the recommended 20%. Keep it up.', cls: 'great' };
+    if (savingsPct >= 20) return { label: 'Healthy savings rate', desc: 'You\'re hitting the 20% benchmark financial advisors recommend. Great foundation.', cls: 'great' };
+    if (savingsPct >= 10) return { label: 'Moderate savings rate', desc: 'You\'re saving 10–20% of income. Try to grow this toward 20% over time.', cls: 'ok' };
+    if (savingsPct > 0) return { label: 'Low savings rate', desc: 'Saving under 10% of income leaves little cushion. Look for ways to reduce spending.', cls: 'low' };
+    return { label: 'No savings this month', desc: 'Spending meets or exceeds income. Focus on cutting costs before investing.', cls: 'low' };
+  }
+
+  function ringColor(cls) {
+    return cls === 'great' ? '#1D9E75' : cls === 'ok' ? '#EF9F27' : '#E24B4A';
+  }
+
+  function buildRing(pct, cls) {
+    const r = 22, cx = 28, cy = 28;
+    const circ = 2 * Math.PI * r;
+    const filled = Math.min(pct / 100, 1) * circ;
+    const color = ringColor(cls);
+    return `<svg width="56" height="56" viewBox="0 0 56 56">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#e5e0d8" stroke-width="5"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="5"
+        stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${circ * 0.25}" stroke-linecap="round"/>
+      <text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="12" font-weight="700" fill="${color}">${pct}%</text>
+    </svg>`;
+  }
+
+  function generate() {
+    const { inc, sp, left } = getLeftover();
+
+    if (!inc || inc <= 0) { alert('Please enter your monthly income.'); return; }
+    if (sp < 0) { alert('Spending cannot be negative.'); return; }
+    if (left <= 0) { alert('Your spending equals or exceeds your income. Nothing left to allocate!'); return; }
+
+    const p = PROFILES[risk];
+    const total = left;
+    const bankAmt = total * p.bankPct / 100;
+    const investAmt = total * p.investPct / 100;
+    const riskLabel = risk.charAt(0).toUpperCase() + risk.slice(1);
+
+    const spendPctOfInc = pctOf(sp, inc);
+    const savePctOfInc = pctOf(left, inc);
+    const score = savingsScore(savePctOfInc);
+
+    const bankRows = p.bankItems.map(item => {
+      const a = total * item.pct / 100;
+      return `<div class="row">
+        <div>
+          <div class="rname">${item.name}</div>
+          <div class="rwhy">${item.why}</div>
+        </div>
+        <div class="row-right">
+          <div class="ramt">${fmt(a)}</div>
+          <div class="rpct">${item.pct}% of leftover</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const investRows = p.investItems.map(item => {
+      const a = total * item.pct / 100;
+      return `<div class="row">
+        <div>
+          <div class="rname">${item.name}</div>
+          <div class="rwhy">${item.why}</div>
+        </div>
+        <div class="row-right">
+          <div class="ramt">${fmt(a)}</div>
+          <div class="rpct">${item.pct}% of leftover</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // 3-segment bar percentages relative to income
+    const bBarPct = pctOf(bankAmt, inc);
+    const iBarPct = pctOf(investAmt, inc);
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').innerHTML = `
+
+      <!-- Snapshot row -->
+      <div class="snapshot">
+        <div class="snap-card income">
+          <div class="snap-lbl income">Income</div>
+          <div class="snap-val income">${fmt(inc)}</div>
+          <div class="snap-sub income">per month</div>
+        </div>
+        <div class="snap-card spend">
+          <div class="snap-lbl spend">Spending</div>
+          <div class="snap-val spend">${fmt(sp)}</div>
+          <div class="snap-sub spend">${spendPctOfInc}% of income</div>
+        </div>
+        <div class="snap-card left">
+          <div class="snap-lbl left">To allocate</div>
+          <div class="snap-val left">${fmt(left)}</div>
+          <div class="snap-sub left">${savePctOfInc}% of income</div>
+        </div>
+      </div>
+
+      <!-- Savings health score -->
+      <div class="score-card">
+        <div class="score-ring">${buildRing(savePctOfInc, score.cls)}</div>
+        <div class="score-info">
+          <div class="score-label">Savings health</div>
+          <div class="score-val ${score.cls}">${score.label}</div>
+          <div class="score-desc">${score.desc}</div>
+        </div>
+      </div>
+
+      <!-- Allocation plan -->
+      <div class="res-header">
+        <div class="res-title">Allocation plan — ${fmt(total)}</div>
+        <span class="badge ${p.badge}">${riskLabel}</span>
+      </div>
+
+      <div class="summary-bar">${p.summary}</div>
+
+      <div class="split-grid">
+        <div class="split-card bank">
+          <div class="split-label bank"><span class="dot dot-bank"></span>Keep in bank</div>
+          <div class="split-pct bank">${p.bankPct}%</div>
+          <div class="split-amt bank">${fmt(bankAmt)} / mo</div>
+        </div>
+        <div class="split-card invest">
+          <div class="split-label invest"><span class="dot dot-invest"></span>Invest</div>
+          <div class="split-pct invest">${p.investPct}%</div>
+          <div class="split-amt invest">${fmt(investAmt)} / mo</div>
+        </div>
+      </div>
+
+      <!-- 3-segment bar vs income -->
+      <div class="bar-wrap">
+        <div class="bar-track">
+          <div class="bar-s" style="width:${spendPctOfInc}%"></div>
+          <div class="bar-b" style="width:${bBarPct}%"></div>
+          <div class="bar-i" style="width:${iBarPct}%"></div>
+        </div>
+        <div class="bar-leg">
+          <div class="leg"><span class="dot dot-spend"></span>Spending ${spendPctOfInc}%</div>
+          <div class="leg"><span class="dot dot-bank"></span>Bank ${bBarPct}%</div>
+          <div class="leg"><span class="dot dot-invest"></span>Invest ${iBarPct}%</div>
+        </div>
+        <div style="font-size:11px;color:var(--subtle);margin-top:5px">As % of monthly income (${fmt(inc)})</div>
+      </div>
+
+      <div class="section">
+        <div class="sec-head bank"><span class="dot dot-bank"></span>Bank & savings — ${fmt(bankAmt)}/mo</div>
+        ${bankRows}
+      </div>
+
+      <div class="section">
+        <div class="sec-head invest"><span class="dot dot-invest"></span>Investments — ${fmt(investAmt)}/mo</div>
+        ${investRows}
+      </div>
+
+      <div class="tip">${p.tip}</div>
+
+      <button id="reset-btn" onclick="reset()">← Adjust my numbers</button>
+    `;
+
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function reset() {
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('results').innerHTML = '';
+    document.getElementById('income').value = '';
+    document.getElementById('spend').value = '';
+    updateLeftover();
+    document.getElementById('income').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') generate();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Smart Money Allocator</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --sage:#1D9E75;--sage-light:#5DCAA5;--sage-muted:#E1F5EE;
+    --gold:#BA7517;--gold-light:#EF9F27;--gold-muted:#FAEEDA;
+    --blue:#185FA5;--blue-light:#378ADD;--blue-muted:#E6F1FB;
+    --ink:#1a1a1a;--muted:#6b7280;--subtle:#9ca3af;
+    --bg:#faf9f7;--card:#ffffff;--border:#e5e0d8;--border2:#d1ccc4;
+    --radius:12px;--radius-sm:8px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
+  }
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem 4rem}
+  h1{font-size:28px;font-weight:700;letter-spacing:-0.8px;margin-bottom:4px;text-align:center}
+  .hero-sub{font-size:15px;color:var(--muted);text-align:center;margin-bottom:2.5rem}
+  .app{width:100%;max-width:580px}
+
+  /* Input card */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1rem}
+  .field-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--subtle);margin-bottom:10px}
+  .amount-row{display:flex;align-items:center;gap:6px;border:1.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 14px;transition:border-color 0.15s;background:#fff}
+  .amount-row:focus-within{border-color:var(--sage)}
+  .currency{font-size:26px;font-weight:700;color:var(--muted)}
+  #amt{font-size:26px;font-weight:700;border:none;outline:none;width:100%;background:transparent;color:var(--ink);letter-spacing:-0.5px}
+  #amt::placeholder{color:#d1ccc4}
+  .divider{height:1px;background:var(--border);margin:1.25rem 0}
+
+  /* Risk buttons */
+  .risk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .rbtn{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 8px;background:#fff;cursor:pointer;text-align:center;transition:all 0.15s;user-select:none}
+  .rbtn:hover{border-color:var(--border2);background:#faf9f7}
+  .rbtn.sel-conservative{border-color:var(--sage);background:var(--sage-muted)}
+  .rbtn.sel-moderate{border-color:var(--blue-light);background:var(--blue-muted)}
+  .rbtn.sel-aggressive{border-color:var(--gold-light);background:var(--gold-muted)}
+  .rbtn-icon{font-size:20px;margin-bottom:5px}
+  .rbtn-name{font-size:13px;font-weight:600;color:var(--ink)}
+  .rbtn-desc{font-size:11px;color:var(--muted);margin-top:2px}
+
+  /* CTA */
+  #go-btn{width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;transition:opacity 0.15s;margin-top:1rem;letter-spacing:-0.2px}
+  #go-btn:hover{opacity:0.85}
+  #go-btn:disabled{opacity:0.4;cursor:not-allowed}
+
+  /* Results */
+  #results{display:none;margin-top:1.5rem}
+  .res-header{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem}
+  .res-title{font-size:20px;font-weight:700;letter-spacing:-0.5px}
+  .badge{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;letter-spacing:0.3px}
+  .badge-conservative{background:var(--sage-muted);color:#085041}
+  .badge-moderate{background:var(--blue-muted);color:#0C447C}
+  .badge-aggressive{background:var(--gold-muted);color:#633806}
+
+  /* Big split */
+  .split-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1rem}
+  .split-card{border-radius:var(--radius-sm);padding:1rem 1.25rem;border:1px solid transparent}
+  .split-card.bank{background:var(--sage-muted);border-color:#9FE1CB}
+  .split-card.invest{background:var(--gold-muted);border-color:#FAC775}
+  .split-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .split-label.bank{color:#0F6E56}
+  .split-label.invest{color:#854F0B}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .dot-bank{background:#1D9E75}
+  .dot-invest{background:#EF9F27}
+  .split-pct{font-size:28px;font-weight:800;letter-spacing:-1px}
+  .split-pct.bank{color:#085041}
+  .split-pct.invest{color:#633806}
+  .split-amt{font-size:13px;margin-top:2px}
+  .split-amt.bank{color:#0F6E56}
+  .split-amt.invest{color:#854F0B}
+
+  /* Bar */
+  .bar-wrap{margin:0.5rem 0 1.5rem}
+  .bar-track{height:10px;border-radius:5px;overflow:hidden;display:flex;background:#eee}
+  .bar-b{height:100%;background:var(--sage);transition:width 0.7s ease}
+  .bar-i{height:100%;background:var(--gold-light);transition:width 0.7s ease}
+  .bar-leg{display:flex;gap:16px;margin-top:6px}
+  .leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+
+  /* Section tables */
+  .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:10px}
+  .sec-head{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:1rem;display:flex;align-items:center;gap:6px}
+  .sec-head.bank{color:#085041}
+  .sec-head.invest{color:#633806}
+  .row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0ede8}
+  .row:last-child{border-bottom:none;padding-bottom:0}
+  .row-left{}
+  .rname{font-size:14px;font-weight:600;color:var(--ink)}
+  .rwhy{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;max-width:300px}
+  .row-right{text-align:right;flex-shrink:0;padding-left:12px}
+  .ramt{font-size:14px;font-weight:700;color:var(--ink)}
+  .rpct{font-size:11px;color:var(--subtle);margin-top:2px}
+
+  /* Tip */
+  .tip{background:#faf9f7;border:1px solid var(--border);border-left:3px solid var(--sage);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:1rem;font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:1rem}
+  .tip strong{color:var(--ink);font-weight:600}
+
+  /* Summary bar */
+  .summary-bar{font-size:13px;color:var(--muted);text-align:center;padding:0.75rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:1rem;line-height:1.5}
+
+  /* Reset */
+  #reset-btn{width:100%;padding:11px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;cursor:pointer;transition:all 0.15s}
+  #reset-btn:hover{background:var(--card);border-color:var(--border2);color:var(--ink)}
+
+  /* Footer disclaimer */
+  .disclaimer{font-size:11px;color:var(--subtle);text-align:center;margin-top:2rem;line-height:1.6;max-width:500px}
+
+  @media(max-width:480px){
+    h1{font-size:22px}
+    .split-pct{font-size:22px}
+    .rname{font-size:13px}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <h1>Smart Money Allocator</h1>
+  <p class="hero-sub">Enter your amount and risk level — get a personalized plan instantly.</p>
+
+  <div id="input-section">
+    <div class="card">
+      <div class="field-label">How much do you want to allocate?</div>
+      <div class="amount-row">
+        <span class="currency">$</span>
+        <input type="number" id="amt" placeholder="10,000" min="0" step="any" />
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field-label">Your risk comfort level</div>
+      <div class="risk-grid">
+        <button class="rbtn" data-risk="conservative" onclick="selectRisk(this)">
+          <div class="rbtn-icon">🏛️</div>
+          <div class="rbtn-name">Conservative</div>
+          <div class="rbtn-desc">Preserve capital</div>
+        </button>
+        <button class="rbtn sel-moderate" data-risk="moderate" onclick="selectRisk(this)">
+          <div class="rbtn-icon">⚖️</div>
+          <div class="rbtn-name">Moderate</div>
+          <div class="rbtn-desc">Balanced growth</div>
+        </button>
+        <button class="rbtn" data-risk="aggressive" onclick="selectRisk(this)">
+          <div class="rbtn-icon">🚀</div>
+          <div class="rbtn-name">Aggressive</div>
+          <div class="rbtn-desc">Maximize returns</div>
+        </button>
+      </div>
+
+      <button id="go-btn" onclick="generate()">Generate my plan →</button>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+  <p class="disclaimer">For educational purposes only. This is not financial advice. Please consult a licensed financial advisor before making investment decisions.</p>
+</div>
+
+<script>
+  let risk = 'moderate';
+
+  function selectRisk(btn) {
+    document.querySelectorAll('.rbtn').forEach(b => {
+      b.className = 'rbtn';
+    });
+    const r = btn.dataset.risk;
+    btn.classList.add('sel-' + r);
+    risk = r;
+  }
+
+  const PROFILES = {
+    conservative: {
+      bankPct: 65, investPct: 35,
+      summary: "Your plan prioritizes safety. Most of your money stays liquid and protected, with a modest slice invested in low-volatility assets for gentle long-term growth.",
+      bankItems: [
+        { name: "High-yield savings account (HYSA)", pct: 35, why: "Liquid emergency fund earning 4.5–5% APY — fully accessible, zero market risk" },
+        { name: "12-month CD", pct: 20, why: "Locks in 5%+ APY — ideal for money you won't need for a year" },
+        { name: "Checking buffer", pct: 10, why: "Covers 4–6 weeks of daily expenses without touching investments" },
+      ],
+      investItems: [
+        { name: "Total bond market ETF (BND / AGG)", pct: 15, why: "Stable income, low volatility — cushions against stock swings" },
+        { name: "S&P 500 index fund (VOO)", pct: 15, why: "Broad US market exposure with long-term growth at low cost" },
+        { name: "Dividend ETF (SCHD / VYM)", pct: 5, why: "Steady dividend income from blue-chip companies" },
+      ],
+      tip: "<strong>Pro tip:</strong> Shop HYSA rates across Marcus, Ally, and SoFi — they often lead. For your CD, check local credit unions too; they frequently beat big banks.",
+      badge: "badge-conservative"
+    },
+    moderate: {
+      bankPct: 40, investPct: 60,
+      summary: "A balanced approach — enough cash to stay secure and flexible, with a meaningful investment allocation to grow your wealth steadily over time.",
+      bankItems: [
+        { name: "High-yield savings account (HYSA)", pct: 25, why: "Emergency fund covering 3–6 months of expenses, earning 4.5%+ APY" },
+        { name: "Checking buffer", pct: 10, why: "Keeps day-to-day spending separate from your savings and investments" },
+        { name: "6-month CD", pct: 5, why: "Slightly better yield on money you won't need in the near term" },
+      ],
+      investItems: [
+        { name: "S&P 500 index fund (VOO / FXAIX)", pct: 25, why: "Core holding — broad market, ~10% historical annual return" },
+        { name: "International ETF (VXUS / VEA)", pct: 15, why: "Geographic diversification reduces single-country risk" },
+        { name: "Bond ETF (BND)", pct: 10, why: "Ballast for volatility — smooths out downturns in your portfolio" },
+        { name: "Growth ETF (QQQ / VUG)", pct: 10, why: "Tech-tilted upside for the long-term portion of your allocation" },
+      ],
+      tip: "<strong>Pro tip:</strong> If you don't have a Roth IRA yet, open one first — your investments grow 100% tax-free inside it. The 2025 contribution limit is $7,000/year.",
+      badge: "badge-moderate"
+    },
+    aggressive: {
+      bankPct: 20, investPct: 80,
+      summary: "Your money works hardest here. A small cash buffer keeps you covered for emergencies, while the bulk is deployed into high-growth investments with strong long-term upside.",
+      bankItems: [
+        { name: "High-yield savings account (HYSA)", pct: 15, why: "Lean emergency fund — liquid and earning 4.5%+ APY" },
+        { name: "Checking buffer", pct: 5, why: "Minimal cash for near-term expenses — avoid selling investments early" },
+      ],
+      investItems: [
+        { name: "S&P 500 index fund (VOO / FXAIX)", pct: 32, why: "Core foundation — reliable broad-market growth over time" },
+        { name: "Growth ETF (QQQ / VUG)", pct: 20, why: "Tech and innovation-heavy upside — higher volatility, higher ceiling" },
+        { name: "Individual growth stocks", pct: 16, why: "Pick 4–6 high-conviction companies; cap each at 4–5% of portfolio" },
+        { name: "Crypto (BTC / ETH only)", pct: 12, why: "Speculative high-upside position — only invest what you can lose" },
+      ],
+      tip: "<strong>Pro tip:</strong> Max your Roth IRA before a taxable brokerage account. Aggressive investments compound fastest — having that growth be tax-free is a massive long-term advantage.",
+      badge: "badge-aggressive"
+    }
+  };
+
+  function fmt(n) {
+    return '$' + Math.round(n).toLocaleString();
+  }
+
+  function generate() {
+    const raw = parseFloat(document.getElementById('amt').value);
+    if (!raw || raw <= 0) {
+      alert('Please enter a valid dollar amount.');
+      return;
+    }
+
+    const p = PROFILES[risk];
+    const total = raw;
+    const bankAmt = total * p.bankPct / 100;
+    const investAmt = total * p.investPct / 100;
+    const riskLabel = risk.charAt(0).toUpperCase() + risk.slice(1);
+
+    const bankRows = p.bankItems.map(item => {
+      const a = total * item.pct / 100;
+      return `<div class="row">
+        <div class="row-left">
+          <div class="rname">${item.name}</div>
+          <div class="rwhy">${item.why}</div>
+        </div>
+        <div class="row-right">
+          <div class="ramt">${fmt(a)}</div>
+          <div class="rpct">${item.pct}% of total</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const investRows = p.investItems.map(item => {
+      const a = total * item.pct / 100;
+      return `<div class="row">
+        <div class="row-left">
+          <div class="rname">${item.name}</div>
+          <div class="rwhy">${item.why}</div>
+        </div>
+        <div class="row-right">
+          <div class="ramt">${fmt(a)}</div>
+          <div class="rpct">${item.pct}% of total</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').innerHTML = `
+      <div class="res-header">
+        <div class="res-title">Your plan — ${fmt(total)}</div>
+        <span class="badge ${p.badge}">${riskLabel}</span>
+      </div>
+
+      <div class="summary-bar">${p.summary}</div>
+
+      <div class="split-grid">
+        <div class="split-card bank">
+          <div class="split-label bank"><span class="dot dot-bank"></span>Keep in bank</div>
+          <div class="split-pct bank">${p.bankPct}%</div>
+          <div class="split-amt bank">${fmt(bankAmt)}</div>
+        </div>
+        <div class="split-card invest">
+          <div class="split-label invest"><span class="dot dot-invest"></span>Invest</div>
+          <div class="split-pct invest">${p.investPct}%</div>
+          <div class="split-amt invest">${fmt(investAmt)}</div>
+        </div>
+      </div>
+
+      <div class="bar-wrap">
+        <div class="bar-track">
+          <div class="bar-b" style="width:${p.bankPct}%"></div>
+          <div class="bar-i" style="width:${p.investPct}%"></div>
+        </div>
+        <div class="bar-leg">
+          <div class="leg"><span class="dot dot-bank"></span>Bank ${p.bankPct}%</div>
+          <div class="leg"><span class="dot dot-invest"></span>Investments ${p.investPct}%</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="sec-head bank"><span class="dot dot-bank"></span>Bank & savings — ${fmt(bankAmt)}</div>
+        ${bankRows}
+      </div>
+
+      <div class="section">
+        <div class="sec-head invest"><span class="dot dot-invest"></span>Investments — ${fmt(investAmt)}</div>
+        ${investRows}
+      </div>
+
+      <div class="tip">${p.tip}</div>
+
+      <button id="reset-btn" onclick="reset()">← Start over with a different amount</button>
+    `;
+
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function reset() {
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('results').innerHTML = '';
+    document.getElementById('amt').value = '';
+    document.getElementById('amt').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.getElementById('amt').addEventListener('keydown', e => {
+    if (e.key === 'Enter') generate();
+  });
+</script>
+</body>
+</html>
