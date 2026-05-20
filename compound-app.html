@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Compound — Money Allocator & Growth Calculator</title>
+<meta name="description" content="Dark, mobile-first fintech calculator: see how your leftover money grows in FD vs stocks over 5, 10, 15, 20 and 25 years." />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0e1320; --bg2:#141a2a; --card:#1a2133; --card2:#222b41;
+    --text:#eef2ff; --muted:#8a93ad; --border:#2a334d;
+    --primary:#3ddc97; --primary2:#1fae74; --accent:#5fb6ff; --warning:#f5c451; --danger:#ff6b6b;
+    --chart1:#3ddc97; --chart2:#5fb6ff; --chart3:#f5c451; --chart4:#c89bff; --chart5:#ff6b6b;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;background:radial-gradient(1200px 600px at 80% -10%,rgba(61,220,151,.08),transparent 60%),radial-gradient(900px 500px at -10% 10%,rgba(95,182,255,.07),transparent 60%),var(--bg)}
+  .num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .grad-text{background:linear-gradient(120deg,var(--primary),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .glass{background:linear-gradient(180deg,rgba(26,33,51,.95),rgba(26,33,51,.78));border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(12px)}
+  svg{display:block}
+
+  /* ── header ── */
+  header{position:sticky;top:0;z-index:30;border-bottom:1px solid var(--border);background:rgba(14,19,32,.7);backdrop-filter:blur(12px)}
+  .wrap{max-width:1024px;margin:0 auto;padding:14px 16px}
+  .logo{height:32px;width:32px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));display:grid;place-items:center;color:#0e1320;font-weight:800;font-size:16px}
+
+  /* ── auth buttons in header ── */
+  .nav-auth{display:flex;align-items:center;gap:8px}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:10px;font-size:13px;cursor:pointer;transition:all .15s;font-family:inherit}
+  .btn-ghost:hover{border-color:var(--primary);color:var(--text)}
+  .btn-primary{background:var(--primary);color:#0e1320;border:none;padding:7px 16px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s;font-family:inherit}
+  .btn-primary:hover{opacity:.85}
+  .user-chip{display:flex;align-items:center;gap:8px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.25);border-radius:99px;padding:5px 14px 5px 5px}
+  .user-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));color:#0e1320;font-size:11px;font-weight:700;display:grid;place-items:center}
+  .user-name{font-size:13px;font-weight:600;color:var(--primary)}
+  .btn-logout{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;padding:0}
+  .btn-logout:hover{color:var(--danger)}
+  .btn-save-nav{background:rgba(61,220,151,.15);border:1px solid rgba(61,220,151,.3);color:var(--primary);padding:6px 14px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+  .btn-save-nav:hover{background:rgba(61,220,151,.25)}
+
+  /* ── modal ── */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+  .overlay.show{display:flex}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:100%;max-width:400px;position:relative;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+  .modal-close{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;padding:4px}
+  .modal-close:hover{color:var(--text)}
+  .modal-title{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+  .modal-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+  .m-field{margin-bottom:14px}
+  .m-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block}
+  .m-input{width:100%;background:rgba(34,43,65,.8);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border-color .15s}
+  .m-input:focus{border-color:var(--primary)}
+  .m-input::placeholder{color:var(--muted)}
+  .m-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .m-btn{width:100%;padding:12px;background:var(--primary);color:#0e1320;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-top:4px}
+  .m-btn:hover{opacity:.85}
+  .m-btn:disabled{opacity:.45;cursor:not-allowed}
+  .m-divider{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:12px}
+  .m-divider::before,.m-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+  .btn-google{width:100%;padding:10px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:border-color .15s}
+  .btn-google:hover{border-color:var(--accent)}
+  .m-switch{text-align:center;font-size:13px;color:var(--muted);margin-top:14px}
+  .m-switch a{color:var(--primary);cursor:pointer;font-weight:600}
+  .m-err{font-size:12px;color:var(--danger);background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.25);border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none}
+  .m-ok{font-size:12px;color:var(--primary);background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.25);border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none}
+
+  /* ── gate ── */
+  #gate{text-align:center;padding:5rem 2rem;max-width:520px;margin:0 auto}
+  .gate-icon{font-size:52px;margin-bottom:1rem}
+  .gate-title{font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+  .gate-sub{font-size:15px;color:var(--muted);margin-bottom:2rem;line-height:1.6}
+  .gate-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .gate-btn-p{padding:12px 28px;background:var(--primary);color:#0e1320;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+  .gate-btn-s{padding:12px 28px;background:transparent;color:var(--text);border:1px solid var(--border);border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit}
+  .gate-btn-s:hover{border-color:var(--primary)}
+
+  /* ── history card ── */
+  .history-card{background:linear-gradient(180deg,rgba(26,33,51,.95),rgba(26,33,51,.78));border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;display:none}
+  .history-card.show{display:block}
+  .h-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .h-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .btn-use{padding:5px 12px;background:rgba(61,220,151,.15);border:1px solid rgba(61,220,151,.3);color:var(--primary);border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+  .h-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);font-size:12px}
+  .h-row:first-of-type{border-top:none}
+  .risk-pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(61,220,151,.12);color:var(--primary)}
+
+  /* ── toast ── */
+  .toasts{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .toast{padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.3);animation:tIn .2s ease;pointer-events:auto}
+  @keyframes tIn{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+  .toast.ok{background:#1a3a2a;border:1px solid rgba(61,220,151,.3);color:var(--primary)}
+  .toast.err{background:#3a1a1a;border:1px solid rgba(255,107,107,.3);color:var(--danger)}
+  .toast.inf{background:var(--card2);border:1px solid var(--border);color:var(--muted)}
+
+  /* ── calculator ── */
+  #app{display:none}
+  h1{font-size:26px;font-weight:700;margin:0;letter-spacing:-.02em}
+  @media(min-width:640px){h1{font-size:30px}}
+  .sub{color:var(--muted);font-size:14px;margin-top:4px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr}
+  @media(min-width:720px){.g2{grid-template-columns:1fr 1fr}}
+  .g3{grid-template-columns:1fr}
+  @media(min-width:540px){.g3{grid-template-columns:repeat(3,1fr)}}
+  .g4{grid-template-columns:repeat(2,1fr)}
+  @media(min-width:720px){.g4{grid-template-columns:repeat(4,1fr)}}
+  .card{padding:16px}
+  .label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px}
+  .field{display:block}
+  .field .lbl{font-size:11px;color:var(--muted);margin-bottom:6px}
+  .amt{display:flex;align-items:center;background:rgba(34,43,65,.6);border:1px solid var(--border);border-radius:12px;padding:0 12px;transition:border-color .15s}
+  .amt:focus-within{border-color:var(--primary)}
+  .amt span{color:var(--muted);font-size:14px}
+  .amt input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font-size:18px;padding:10px 0 10px 8px;width:100%;font-family:inherit}
+  .leftover{margin-top:14px;background:rgba(34,43,65,.6);border-radius:12px;padding:12px;display:flex;justify-content:space-between;align-items:center}
+  .leftover .v{font-size:20px;font-weight:600}
+  .pos{color:var(--primary)} .neg{color:var(--muted)} .danger{color:var(--danger)}
+  .risk{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .rbtn{cursor:pointer;border-radius:12px;padding:12px;text-align:left;border:1px solid var(--border);background:rgba(34,43,65,.4);color:var(--text);transition:all .15s;font-family:inherit}
+  .rbtn:hover{background:var(--card2)}
+  .rbtn.active{border-color:var(--primary);background:rgba(61,220,151,.1);box-shadow:0 0 0 1px rgba(61,220,151,.35),0 10px 30px -12px rgba(61,220,151,.4)}
+  .rbtn .ic{font-size:18px}
+  .rbtn .n{margin-top:8px;font-size:14px;font-weight:500}
+  .rbtn .d{font-size:11px;color:var(--muted)}
+  .rbtn .r{margin-top:4px;font-size:12px;color:var(--primary);font-weight:600}
+  .range{width:100%;accent-color:var(--primary)}
+  .stat{position:relative;overflow:hidden;padding:14px;border-radius:var(--radius);background:linear-gradient(180deg,rgba(26,33,51,.95),rgba(26,33,51,.78));border:1px solid var(--border)}
+  .stat::before{content:"";position:absolute;inset-inline:0;top:-50px;height:80px;pointer-events:none;background:linear-gradient(180deg,rgba(61,220,151,.18),transparent)}
+  .stat.accent::before{background:linear-gradient(180deg,rgba(95,182,255,.18),transparent)}
+  .stat.warn::before{background:linear-gradient(180deg,rgba(245,196,81,.18),transparent)}
+  .stat .top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .stat .val{margin-top:8px;font-size:24px;font-weight:600}
+  .stat .sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .tabs{display:flex;gap:4px;padding:6px;border-radius:var(--radius);background:linear-gradient(180deg,rgba(26,33,51,.95),rgba(26,33,51,.78));border:1px solid var(--border);overflow-x:auto;position:sticky;top:60px;z-index:20}
+  .tab{position:relative;border:0;background:transparent;color:var(--muted);padding:9px 14px;border-radius:10px;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:color .15s;font-family:inherit}
+  .tab:hover{color:var(--text)}
+  .tab.active{color:#0e1320;background:var(--primary);font-weight:600}
+  .panel{animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:11px;color:var(--muted);font-weight:500;padding:8px 0;text-transform:uppercase;letter-spacing:.06em}
+  td{padding:10px 0;border-top:1px solid var(--border)}
+  .right{text-align:right}
+  .bar{height:6px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:6px}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .5s ease}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:99px;font-size:11px;background:rgba(61,220,151,.12);color:var(--primary)}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:8px}
+  .dot{height:8px;width:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .disclaim{font-size:11px;color:var(--muted);text-align:center;padding:18px 0 32px}
+  .warn-msg{margin-top:10px;color:var(--danger);font-size:12px;display:none}
+  .warn-msg.show{display:block}
+  .stock{padding:14px}
+  .stock .head{display:flex;justify-content:space-between;align-items:start;gap:8px}
+  .stock .ticker{font-weight:600;font-size:16px}
+  .stock .cat{font-size:11px;color:var(--muted)}
+  .stock .alloc{font-size:18px;font-weight:600;color:var(--primary)}
+  .stock .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px}
+  input[type=range]{height:18px}
+</style>
+</head>
+<body>
+
+<!-- Toast container -->
+<div class="toasts" id="toasts"></div>
+
+<!-- Auth Modal -->
+<div class="overlay" id="auth-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+
+    <!-- Login -->
+    <div id="v-login">
+      <div class="modal-title">Welcome back</div>
+      <div class="modal-sub">Log in to save and track your data</div>
+      <div class="m-err" id="login-err"></div>
+      <div class="m-ok"  id="login-ok"></div>
+      <button class="btn-google" onclick="googleLogin()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.7 0 6.7 5.3 2.7 13.1l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 019.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 000 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-4.2-13.4-9.9l-7.9 6C6.6 42.7 14.7 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <div class="m-divider">or</div>
+      <div class="m-field"><label class="m-label">Email</label><input class="m-input" id="l-email" type="email" placeholder="you@email.com"/></div>
+      <div class="m-field"><label class="m-label">Password</label><input class="m-input" id="l-pass" type="password" placeholder="••••••••"/></div>
+      <button class="m-btn" id="login-btn" onclick="doLogin()">Log in</button>
+      <div class="m-switch">No account? <a onclick="switchView('signup')">Sign up free</a></div>
+    </div>
+
+    <!-- Signup -->
+    <div id="v-signup" style="display:none">
+      <div class="modal-title">Create account</div>
+      <div class="modal-sub">Start tracking your money growth</div>
+      <div class="m-err" id="signup-err"></div>
+      <button class="btn-google" onclick="googleLogin()">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.2l6.7-6.7C35.8 2.5 30.2 0 24 0 14.7 0 6.7 5.3 2.7 13.1l7.8 6C12.4 13 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.7A14.6 14.6 0 019.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A23.9 23.9 0 000 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.2 0-11.5-4.2-13.4-9.9l-7.9 6C6.6 42.7 14.7 48 24 48z"/></svg>
+        Sign up with Google
+      </button>
+      <div class="m-divider">or</div>
+      <div class="m-row">
+        <div class="m-field"><label class="m-label">First name</label><input class="m-input" id="s-first" type="text" placeholder="Jaspal"/></div>
+        <div class="m-field"><label class="m-label">Last name</label><input class="m-input" id="s-last" type="text" placeholder="Juneja"/></div>
+      </div>
+      <div class="m-field"><label class="m-label">Email</label><input class="m-input" id="s-email" type="email" placeholder="you@email.com"/></div>
+      <div class="m-field"><label class="m-label">Password <span style="color:var(--muted);font-size:10px;text-transform:none">(min 6 chars)</span></label><input class="m-input" id="s-pass" type="password" placeholder="••••••••"/></div>
+      <button class="m-btn" id="signup-btn" onclick="doSignup()">Create account</button>
+      <div class="m-switch">Already have an account? <a onclick="switchView('login')">Log in</a></div>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="logo">₿</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;line-height:1">Compound</div>
+        <div style="font-size:10px;color:var(--muted)">Money allocator</div>
+      </div>
+    </div>
+    <div class="nav-auth" id="nav-auth">
+      <button class="btn-ghost" onclick="openModal('login')">Log in</button>
+      <button class="btn-primary" onclick="openModal('signup')">Sign up</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" style="display:flex;flex-direction:column;gap:22px;padding-top:22px">
+
+  <!-- Gate -->
+  <div id="gate">
+    <div class="gate-icon">💰</div>
+    <h1 class="gate-title">Grow what you keep,<br><span class="grad-text">month by month.</span></h1>
+    <p class="gate-sub">See how your leftover money compounds across FD and stocks over 5, 10, 15, 20 &amp; 25 years. Save your progress and come back anytime.</p>
+    <div class="gate-btns">
+      <button class="gate-btn-p" onclick="openModal('signup')">Get started — it's free</button>
+      <button class="gate-btn-s" onclick="openModal('login')">Log in</button>
+    </div>
+  </div>
+
+  <!-- Calculator (hidden until login) -->
+  <div id="app">
+
+    <!-- History card -->
+    <div class="history-card" id="history-card">
+      <div class="h-head">
+        <div class="h-title">📅 Your saved sessions</div>
+        <button class="btn-use" onclick="useLatest()">Use latest →</button>
+      </div>
+      <div id="history-rows"></div>
+    </div>
+
+    <section>
+      <h1>Grow what you keep, <span class="grad-text">month by month</span>.</h1>
+      <p class="sub">See how your leftover money compounds across FD and stocks over 5, 10, 15, 20 &amp; 25 years.</p>
+    </section>
+
+    <section class="grid g2">
+      <div class="glass card">
+        <div class="label">Step 1 · Monthly income &amp; spending</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
+          <label class="field"><div class="lbl">Income</div>
+            <div class="amt"><span>$</span><input id="income" type="number" inputmode="decimal" value="6000" min="0"/></div>
+          </label>
+          <label class="field"><div class="lbl">Spending</div>
+            <div class="amt"><span>$</span><input id="spend" type="number" inputmode="decimal" value="3500" min="0"/></div>
+          </label>
+        </div>
+        <div class="leftover">
+          <div style="font-size:12px;color:var(--muted)">Monthly leftover</div>
+          <div class="v num pos" id="leftover">$2,500</div>
+        </div>
+        <div class="warn-msg" id="warn">⚠️ Spending exceeds income — nothing left to invest.</div>
+      </div>
+
+      <div class="glass card">
+        <div class="label">Step 2 · Risk appetite</div>
+        <div class="risk" id="risk">
+          <button class="rbtn" data-r="conservative"><div class="ic">🏛️</div><div class="n">Conservative</div><div class="d">Bonds, large caps</div><div class="r">8% p.a.</div></button>
+          <button class="rbtn active" data-r="moderate"><div class="ic">⚖️</div><div class="n">Moderate</div><div class="d">Index funds, ETFs</div><div class="r">12% p.a.</div></button>
+          <button class="rbtn" data-r="aggressive"><div class="ic">🚀</div><div class="n">Aggressive</div><div class="d">Growth stocks</div><div class="r">15% p.a.</div></button>
+        </div>
+        <div style="margin-top:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--muted)">Stocks / FD split</span>
+            <span class="num"><span id="splitTxt" style="color:var(--primary);font-weight:600">60%</span> stocks · <span id="splitTxt2">40%</span> FD</span>
+          </div>
+          <input type="range" id="split" class="range" min="0" max="100" step="5" value="60" style="margin-top:8px"/>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid g4" id="kpis"></section>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-t="growth">📈 Growth</button>
+      <button class="tab" data-t="alloc">🥧 Allocation</button>
+      <button class="tab" data-t="plan">💼 Planner</button>
+      <button class="tab" data-t="goal">🎯 Goal</button>
+      <button class="tab" data-t="stocks">✨ Stocks</button>
+    </nav>
+
+    <section id="panel"></section>
+
+    <p class="disclaim">For educational purposes only. Not financial advice. FD assumed at 6.5% p.a. Stock returns: Conservative 8%, Moderate 12%, Aggressive 15% p.a., compounded monthly.</p>
+  </div>
+
+</main>
+
+<script>
+// ── Supabase ──────────────────────────────────────────────────────────────────
+const SUPA_URL  = 'https://vrdchszesgtdwuivaaen.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZGNoc3plc2d0ZHd1aXZhYWVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzODk4NTEsImV4cCI6MjA5Mzk2NTg1MX0.CzmZ0hmNo39zRhlNObL3zYrel2NnzBip9XbH6XW5sTM';
+const sb        = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+let latestSnap  = null;
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(v) {
+  document.getElementById('auth-modal').classList.add('show');
+  switchView(v);
+}
+function closeModal() {
+  document.getElementById('auth-modal').classList.remove('show');
+  clearErrs();
+}
+function switchView(v) {
+  document.getElementById('v-login').style.display  = v==='login'  ? 'block' : 'none';
+  document.getElementById('v-signup').style.display = v==='signup' ? 'block' : 'none';
+  clearErrs();
+}
+function clearErrs() {
+  ['login-err','login-ok','signup-err'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) { el.style.display='none'; el.textContent=''; }
+  });
+}
+function showErr(id, msg) { const e=document.getElementById(id); e.textContent=msg; e.style.display='block'; }
+document.getElementById('auth-modal').addEventListener('click', e => {
+  if(e.target===document.getElementById('auth-modal')) closeModal();
+});
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+async function doSignup() {
+  const first = document.getElementById('s-first').value.trim();
+  const last  = document.getElementById('s-last').value.trim();
+  const email = document.getElementById('s-email').value.trim();
+  const pass  = document.getElementById('s-pass').value;
+  if(!first||!last||!email||!pass) { showErr('signup-err','Please fill in all fields.'); return; }
+  if(pass.length < 6)              { showErr('signup-err','Password must be at least 6 characters.'); return; }
+  const btn = document.getElementById('signup-btn');
+  btn.disabled=true; btn.textContent='Creating account…';
+  const { data, error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { first_name: first, last_name: last } }
+  });
+  btn.disabled=false; btn.textContent='Create account';
+  if(error) { showErr('signup-err', error.message); return; }
+  closeModal();
+  toast(`Welcome, ${first}! 🎉`);
+  onLogin(data.user);
+}
+
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass  = document.getElementById('l-pass').value;
+  if(!email||!pass) { showErr('login-err','Please enter your email and password.'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled=true; btn.textContent='Logging in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled=false; btn.textContent='Log in';
+  if(error) { showErr('login-err', error.message); return; }
+  closeModal();
+  const name = data.user.user_metadata?.first_name || email;
+  toast(`Welcome back, ${name}! 👋`);
+  onLogin(data.user);
+}
+
+async function googleLogin() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+  if(error) toast(error.message, 'err');
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  currentUser = null; latestSnap = null;
+  renderNav();
+  document.getElementById('gate').style.display = 'block';
+  document.getElementById('app').style.display  = 'none';
+  document.getElementById('history-card').classList.remove('show');
+  toast('Logged out.', 'inf');
+}
+
+function onLogin(user) {
+  currentUser = user;
+  renderNav();
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display  = 'block';
+  loadHistory();
+  render();
+}
+
+function renderNav() {
+  const nav = document.getElementById('nav-auth');
+  if(currentUser) {
+    const meta = currentUser.user_metadata || {};
+    const name = meta.first_name || currentUser.email?.split('@')[0] || '?';
+    const last = meta.last_name  || '';
+    const ini  = ((meta.first_name||'?')[0]+(meta.last_name||'')[0]).toUpperCase();
+    nav.innerHTML = `
+      <button class="btn-save-nav" onclick="saveData()">💾 Save</button>
+      <div class="user-chip">
+        <div class="user-avatar">${ini}</div>
+        <span class="user-name">${name}</span>
+        <button class="btn-logout" onclick="doLogout()">Log out</button>
+      </div>`;
+  } else {
+    nav.innerHTML = `
+      <button class="btn-ghost"   onclick="openModal('login')">Log in</button>
+      <button class="btn-primary" onclick="openModal('signup')">Sign up</button>`;
+  }
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+async function saveData() {
+  if(!currentUser) { openModal('login'); return; }
+  const { error } = await sb.from('snapshots').insert({
+    user_id:  currentUser.id,
+    income:   state.income,
+    spending: state.spend,
+    risk:     state.risk,
+    split:    state.split,
+  });
+  if(error) { toast('Save failed: '+error.message, 'err'); return; }
+  toast('✅ Saved!');
+  loadHistory();
+}
+
+async function loadHistory() {
+  if(!currentUser) return;
+  const { data, error } = await sb.from('snapshots')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('saved_at', { ascending: false })
+    .limit(6);
+  if(error || !data?.length) return;
+  latestSnap = data[0];
+  const hCard = document.getElementById('history-card');
+  document.getElementById('history-rows').innerHTML = data.map(r => `
+    <div class="h-row">
+      <span style="color:var(--muted)">${new Date(r.saved_at).toLocaleString()}</span>
+      <span class="num">$${Math.round(r.income).toLocaleString()} income · $${Math.round(r.income-r.spending).toLocaleString()} leftover</span>
+      <span class="risk-pill">${r.risk}</span>
+    </div>`).join('');
+  hCard.classList.add('show');
+}
+
+function useLatest() {
+  if(!latestSnap) return;
+  document.getElementById('income').value = latestSnap.income;
+  document.getElementById('spend').value  = latestSnap.spending;
+  state.income = latestSnap.income;
+  state.spend  = latestSnap.spending;
+  state.risk   = latestSnap.risk;
+  state.split  = latestSnap.split;
+  document.getElementById('split').value = latestSnap.split;
+  document.querySelectorAll('#risk .rbtn').forEach(b => {
+    b.classList.toggle('active', b.dataset.r === latestSnap.risk);
+  });
+  render();
+  toast('✅ Loaded your latest session!');
+}
+
+// ── Session restore ───────────────────────────────────────────────────────────
+sb.auth.onAuthStateChange((event, session) => {
+  if(session?.user) { onLogin(session.user); }
+});
+
+// ── Finance logic ─────────────────────────────────────────────────────────────
+const FD_RATE    = 0.065;
+const STOCK_RATES = { conservative:0.08, moderate:0.12, aggressive:0.15 };
+const HORIZONS   = [5,10,12,15,20,25];
+
+function sipFV(monthly, rate, years) {
+  if(monthly<=0||years<=0) return 0;
+  const r=rate/12, n=years*12;
+  return r===0 ? monthly*n : monthly*((Math.pow(1+r,n)-1)/r)*(1+r);
+}
+function reqMonthly(goal,rate,years){
+  const r=rate/12,n=years*12;
+  return r===0?goal/n:goal/(((Math.pow(1+r,n)-1)/r)*(1+r));
+}
+function fmt(n){
+  if(!isFinite(n)) return "$0";
+  const a=Math.abs(n);
+  if(a>=1e6) return "$"+(n/1e6).toFixed(2)+"M";
+  if(a>=1e3) return "$"+(n/1e3).toFixed(1)+"K";
+  return "$"+Math.round(n).toLocaleString();
+}
+function fmtFull(n){ return "$"+Math.round(n||0).toLocaleString(); }
+
+const PICKS = {
+  conservative:[
+    {t:"BND",n:"Vanguard Total Bond Market",c:"Bonds",a:40,note:"Capital preservation"},
+    {t:"VIG",n:"Vanguard Dividend Appreciation",c:"Dividend ETF",a:25,note:"Steady income"},
+    {t:"JNJ",n:"Johnson & Johnson",c:"Large Cap Defensive",a:15,note:"Blue-chip stability"},
+    {t:"KO",n:"Coca-Cola",c:"Consumer Staples",a:10,note:"Recession resilient"},
+    {t:"VYM",n:"Vanguard High Dividend Yield",c:"Dividend ETF",a:10,note:"Yield focus"},
+  ],
+  moderate:[
+    {t:"VOO",n:"Vanguard S&P 500",c:"Index ETF",a:35,note:"Core market exposure"},
+    {t:"QQQ",n:"Invesco Nasdaq 100",c:"Tech Index",a:20,note:"Growth tilt"},
+    {t:"VXUS",n:"Vanguard Total Intl Stock",c:"International",a:15,note:"Global diversification"},
+    {t:"MSFT",n:"Microsoft",c:"Large Cap Tech",a:15,note:"Quality compounder"},
+    {t:"SCHD",n:"Schwab US Dividend Equity",c:"Dividend ETF",a:15,note:"Income + growth"},
+  ],
+  aggressive:[
+    {t:"QQQ",n:"Invesco Nasdaq 100",c:"Tech Index",a:25,note:"High growth core"},
+    {t:"NVDA",n:"NVIDIA",c:"Semiconductors",a:20,note:"AI leader"},
+    {t:"TSLA",n:"Tesla",c:"EV / Energy",a:15,note:"Disruptive growth"},
+    {t:"ARKK",n:"ARK Innovation",c:"Innovation ETF",a:15,note:"Disruptive themes"},
+    {t:"SMH",n:"VanEck Semiconductor",c:"Semi ETF",a:15,note:"Chip exposure"},
+    {t:"PLTR",n:"Palantir",c:"Software / AI",a:10,note:"High beta"},
+  ],
+};
+
+const state = { income:6000, spend:3500, risk:"moderate", split:60, tab:"growth", goal:100000, years:10 };
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+function lineChart(series, opts){
+  const W=720, H=opts.height||280, P={l:48,r:12,t:12,b:28};
+  const allY=series.flatMap(s=>s.data.map(d=>d.y));
+  const allX=series[0].data.map(d=>d.x);
+  const maxY=Math.max(...allY,1), maxX=Math.max(...allX);
+  const x=v=>P.l+(v/maxX)*(W-P.l-P.r);
+  const y=v=>H-P.b-(v/maxY)*(H-P.t-P.b);
+  const grid=[]; const steps=4;
+  for(let i=0;i<=steps;i++){
+    const v=maxY*i/steps, yy=y(v);
+    grid.push(`<line x1="${P.l}" x2="${W-P.r}" y1="${yy}" y2="${yy}" stroke="var(--border)" stroke-dasharray="3 3"/>`);
+    grid.push(`<text x="${P.l-8}" y="${yy+4}" text-anchor="end" fill="var(--muted)" font-size="10">${fmt(v)}</text>`);
+  }
+  const xt=[1,Math.round(maxX/2),maxX].map(v=>`<text x="${x(v)}" y="${H-8}" text-anchor="middle" fill="var(--muted)" font-size="10">${v}y</text>`);
+  const paths=series.map(s=>{
+    const d=s.data.map((p,i)=>(i?'L':'M')+x(p.x)+' '+y(p.y)).join(' ');
+    const area=d+` L${x(s.data[s.data.length-1].x)} ${y(0)} L${x(s.data[0].x)} ${y(0)} Z`;
+    const id="g"+s.name.replace(/\W/g,'');
+    return `<defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="${s.color}" stop-opacity="${s.dashed?0:0.45}"/><stop offset="100%" stop-color="${s.color}" stop-opacity="0"/></linearGradient></defs>
+      ${s.dashed?'':`<path d="${area}" fill="url(#${id})"/>`}
+      <path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" ${s.dashed?'stroke-dasharray="5 4"':''}/>`;
+  }).join('');
+  const legend=series.map(s=>`<span><span class="dot" style="background:${s.color}"></span>${s.name}</span>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px">${grid.join('')}${paths}${xt.join('')}</svg><div class="legend">${legend}</div>`;
+}
+
+function pieChart(data){
+  const total=data.reduce((s,d)=>s+d.value,0)||1;
+  const cx=110,cy=110,r=85,ir=55; let a0=-Math.PI/2;
+  const arcs=data.map(d=>{
+    const a1=a0+(d.value/total)*Math.PI*2, large=(a1-a0)>Math.PI?1:0;
+    const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+    const xi1=cx+ir*Math.cos(a1),yi1=cy+ir*Math.sin(a1),xi0=cx+ir*Math.cos(a0),yi0=cy+ir*Math.sin(a0);
+    const path=`M${x0} ${y0} A${r} ${r} 0 ${large} 1 ${x1} ${y1} L${xi1} ${yi1} A${ir} ${ir} 0 ${large} 0 ${xi0} ${yi0} Z`;
+    a0=a1; return `<path d="${path}" fill="${d.color}"/>`;
+  }).join('');
+  const legend=data.map(d=>`<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px"><span style="color:var(--muted)"><span class="dot" style="background:${d.color}"></span>${d.name}</span><span class="num">${fmtFull(d.value)} <span style="color:var(--muted)">(${Math.round(d.value/total*100)}%)</span></span></div>`).join('');
+  return `<div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:center"><svg viewBox="0 0 220 220" style="width:220px;height:220px">${arcs}<circle cx="${cx}" cy="${cy}" r="${ir-2}" fill="var(--card)"/><text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--muted)" font-size="11">Total</text><text x="${cx}" y="${cy+16}" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="600">${fmtFull(total)}</text></svg><div>${legend}</div></div>`;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+const $ = s => document.querySelector(s);
+const panel = () => document.getElementById('panel');
+
+function derive(){
+  const left=Math.max(0,state.income-state.spend);
+  const sm=left*state.split/100, fm=left-sm;
+  const sr=STOCK_RATES[state.risk];
+  return { left, sm, fm, sr, blended:(state.split*sr+(100-state.split)*FD_RATE)/100 };
+}
+
+function renderInputs(){
+  const left=state.income-state.spend;
+  $('#leftover').textContent = fmtFull(Math.max(0,left));
+  $('#leftover').className   = "v num "+(left>0?'pos':'neg');
+  $('#warn').classList.toggle('show', state.spend>state.income && state.income>0);
+  $('#splitTxt').textContent  = state.split+'%';
+  $('#splitTxt2').textContent = (100-state.split)+'%';
+}
+
+function renderKpis(){
+  const d=derive();
+  document.getElementById('kpis').innerHTML=[
+    {l:"Stocks / month",v:fmtFull(d.sm),s:(d.sr*100).toFixed(0)+"% p.a.",c:""},
+    {l:"FD / month",v:fmtFull(d.fm),s:(FD_RATE*100).toFixed(1)+"% p.a.",c:"accent"},
+    {l:"In 10 years",v:fmt(sipFV(d.sm,d.sr,10)+sipFV(d.fm,FD_RATE,10)),s:"Total corpus",c:""},
+    {l:"In 25 years",v:fmt(sipFV(d.sm,d.sr,25)+sipFV(d.fm,FD_RATE,25)),s:"Long-term",c:"warn"},
+  ].map(k=>`<div class="stat ${k.c}"><div class="top"><span>${k.l}</span></div><div class="val num">${k.v}</div><div class="sub">${k.s}</div></div>`).join('');
+}
+
+function renderPanel(){
+  const d=derive();
+  const p=panel();
+  if(state.tab==='growth'){
+    const data=[]; for(let y=1;y<=25;y++) data.push({y,stocks:sipFV(d.sm,d.sr,y),fd:sipFV(d.fm,FD_RATE,y),inv:(d.sm+d.fm)*12*y});
+    const chart=lineChart([
+      {name:"Stocks",color:"var(--chart1)",data:data.map(p=>({x:p.y,y:p.stocks}))},
+      {name:"FD",color:"var(--chart2)",data:data.map(p=>({x:p.y,y:p.fd}))},
+      {name:"Invested",color:"var(--muted)",dashed:true,data:data.map(p=>({x:p.y,y:p.inv}))},
+    ],{height:280});
+    const hsum=HORIZONS.map(y=>{
+      const mix=sipFV(d.sm,d.sr,y)+sipFV(d.fm,FD_RATE,y);
+      const all=sipFV(d.sm+d.fm,FD_RATE,y);
+      return `<div class="glass card"><div style="font-size:11px;color:var(--muted)">In ${y} years</div><div class="num" style="font-size:20px;font-weight:600;margin-top:4px">${fmt(mix)}</div><div style="font-size:11px;color:var(--muted);margin-top:6px">FD-only: <span class="num">${fmt(all)}</span></div><div style="font-size:11px;color:var(--primary);margin-top:2px" class="num">+${fmt(mix-all)} vs all-FD</div></div>`;
+    }).join('');
+    p.innerHTML=`<div class="panel" style="display:flex;flex-direction:column;gap:14px"><div class="glass card"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><div><div style="font-size:14px;font-weight:500">25-year growth</div><div style="font-size:12px;color:var(--muted)">Stocks vs FD vs total invested</div></div></div>${chart}</div><div class="grid g3">${hsum}</div></div>`;
+  }
+  else if(state.tab==='alloc'){
+    const pdata=[{name:"Spending",value:state.spend,color:"var(--chart5)"},{name:"Stocks",value:d.sm,color:"var(--chart1)"},{name:"FD",value:d.fm,color:"var(--chart2)"}].filter(x=>x.value>0);
+    p.innerHTML=`<div class="panel glass card">${pieChart(pdata)}</div>`;
+  }
+  else if(state.tab==='plan'){
+    const rows=HORIZONS.map(y=>{const s=sipFV(d.sm,d.sr,y),f=sipFV(d.fm,FD_RATE,y);return `<tr class="num"><td>${y}y</td><td class="right" style="color:var(--primary)">${fmtFull(s)}</td><td class="right" style="color:var(--accent)">${fmtFull(f)}</td><td class="right" style="font-weight:600">${fmtFull(s+f)}</td></tr>`;}).join('');
+    p.innerHTML=`<div class="panel glass card" style="display:flex;flex-direction:column;gap:14px"><div><div style="font-size:14px;font-weight:500">Monthly investment planner</div><div style="font-size:12px;color:var(--muted)">Tune your split — see how each horizon shifts.</div></div><div><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--muted)">Investing</span><span class="num"><span style="color:var(--primary);font-weight:600">${fmtFull(d.left)}</span> / month</span></div><input type="range" id="split2" class="range" min="0" max="100" step="5" value="${state.split}" style="margin-top:8px"/><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px"><span>All FD</span><span class="num">${state.split}% stocks</span><span>All stocks</span></div></div><table><thead><tr><th>Years</th><th class="right">Stocks</th><th class="right">FD</th><th class="right">Total</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    document.getElementById('split2').addEventListener('input',e=>{state.split=+e.target.value;$('#split').value=state.split;renderInputs();renderKpis();renderPanel();});
+  }
+  else if(state.tab==='goal'){
+    const need=reqMonthly(state.goal,d.blended,state.years);
+    const onTrack=d.left>=need;
+    const proj=[]; for(let y=1;y<=state.years;y++) proj.push({y,v:sipFV(need,d.blended,y)});
+    const chart=lineChart([{name:"Projected",color:"var(--chart1)",data:proj.map(p=>({x:p.y,y:p.v}))},{name:"Goal",color:"var(--chart3)",dashed:true,data:proj.map(p=>({x:p.y,y:state.goal}))}],{height:240});
+    p.innerHTML=`<div class="panel" style="display:flex;flex-direction:column;gap:14px"><div class="glass card grid g2"><label class="field"><div class="lbl">Goal amount</div><div class="amt"><span>$</span><input id="goal" type="number" value="${state.goal}" min="0"/></div></label><label class="field"><div class="lbl">Years to reach</div><div class="amt" style="gap:10px"><input type="range" id="years" min="1" max="30" value="${state.years}" class="range" style="flex:1"/><span class="num" style="font-size:16px;min-width:36px;text-align:right">${state.years}y</span></div></label></div><div class="grid g3"><div class="stat"><div class="top"><span>Need / month</span></div><div class="val num">${fmtFull(need)}</div><div class="sub">@ ${(d.blended*100).toFixed(1)}% blended</div></div><div class="stat ${onTrack?'':''}"><div class="top"><span>Your leftover</span></div><div class="val num">${fmtFull(d.left)}</div><div class="sub">${onTrack?'On track 🎯':'Short '+fmtFull(need-d.left)}</div></div><div class="stat"><div class="top"><span>Total invested</span></div><div class="val num">${fmt(need*12*state.years)}</div><div class="sub">over ${state.years} years</div></div></div><div class="glass card"><div style="font-size:14px;font-weight:500;margin-bottom:6px">Path to ${fmt(state.goal)}</div>${chart}</div></div>`;
+    document.getElementById('goal').addEventListener('input',e=>{state.goal=+e.target.value||0;renderPanel();});
+    document.getElementById('years').addEventListener('input',e=>{state.years=+e.target.value;renderPanel();});
+  }
+  else if(state.tab==='stocks'){
+    const meta={conservative:{n:"Conservative",ic:"🏛️"},moderate:{n:"Moderate",ic:"⚖️"},aggressive:{n:"Aggressive",ic:"🚀"}}[state.risk];
+    const cards=PICKS[state.risk].map(pick=>`<div class="glass stock"><div class="head"><div><div class="cat">${pick.c}</div><div class="ticker">${pick.t} <span style="color:var(--muted);font-weight:400;font-size:12px">· ${pick.n}</span></div></div><div style="text-align:right"><div style="font-size:11px;color:var(--muted)">Allocate</div><div class="alloc num">${pick.a}%</div></div></div><div class="row"><span>${pick.note}</span><span class="num">${fmtFull(d.sm*pick.a/100)} / mo</span></div><div class="bar"><div style="width:${pick.a}%"></div></div></div>`).join('');
+    p.innerHTML=`<div class="panel" style="display:flex;flex-direction:column;gap:14px"><div class="glass card" style="display:flex;gap:12px;align-items:flex-start"><div style="height:40px;width:40px;border-radius:12px;background:rgba(61,220,151,.15);display:grid;place-items:center;font-size:18px">${meta.ic}</div><div><div style="font-size:14px;font-weight:500">${meta.n} portfolio · <span style="color:var(--primary)">${(d.sr*100).toFixed(0)}% p.a.</span></div><div style="font-size:12px;color:var(--muted)">Suggested allocation for your monthly stock budget of <span class="num" style="color:var(--text)">${fmtFull(d.sm)}</span>.</div></div></div><div class="grid g2">${cards}</div><p style="font-size:11px;color:var(--muted)">Illustrative allocations only — not buy recommendations.</p></div>`;
+  }
+}
+
+function render(){ renderInputs(); renderKpis(); renderPanel(); }
+
+// ── Events ────────────────────────────────────────────────────────────────────
+document.getElementById('income').addEventListener('input',e=>{state.income=Math.max(0,+e.target.value||0);render();});
+document.getElementById('spend').addEventListener('input',e=>{state.spend=Math.max(0,+e.target.value||0);render();});
+document.getElementById('split').addEventListener('input',e=>{state.split=+e.target.value;render();});
+document.querySelectorAll('#risk .rbtn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#risk .rbtn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); state.risk=b.dataset.r; render();
+}));
+document.querySelectorAll('#tabs .tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); state.tab=b.dataset.t; renderPanel();
+}));
+
+// keyboard enter in modal
+['l-email','l-pass'].forEach(id=>document.getElementById(id)?.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();}));
+['s-first','s-last','s-email','s-pass'].forEach(id=>document.getElementById(id)?.addEventListener('keydown',e=>{if(e.key==='Enter')doSignup();}));
+</script>
+</body>
+</html>
