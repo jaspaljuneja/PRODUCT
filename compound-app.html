@@ -485,10 +485,22 @@ function useLatest() {
   toast('✅ Loaded your latest session!');
 }
 
-// ── Session restore ───────────────────────────────────────────────────────────
+// ── Session restore — handles OAuth redirect + existing sessions ──────────────
 sb.auth.onAuthStateChange((event, session) => {
-  if(session?.user) { onLogin(session.user); }
+  if(session?.user) {
+    onLogin(session.user);
+    // clean the URL hash after OAuth redirect
+    if(window.location.hash && window.location.hash.includes('access_token')) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  }
 });
+
+// also check for an existing session immediately on load
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if(data?.session?.user) onLogin(data.session.user);
+})();
 
 // ── Finance logic ─────────────────────────────────────────────────────────────
 const FD_RATE    = 0.065;
