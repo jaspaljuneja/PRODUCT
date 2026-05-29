@@ -388,9 +388,14 @@ async function doLogin() {
 }
 
 async function googleLogin() {
-  const { error } = await sb.auth.signInWithOAuth({
+  closeModal();
+  const { data, error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: {
+      redirectTo: window.location.href.split('#')[0],
+      skipBrowserRedirect: false,
+      queryParams: { prompt: 'select_account' }
+    }
   });
   if(error) toast(error.message, 'err');
 }
@@ -487,9 +492,14 @@ function useLatest() {
 
 // ── Session restore ───────────────────────────────────────────────────────────
 sb.auth.onAuthStateChange((event, session) => {
-  if((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+  if(['SIGNED_IN', 'TOKEN_REFRESHED', 'INITIAL_SESSION'].includes(event) && session?.user) {
     onLogin(session.user);
-    if(window.location.hash) history.replaceState(null, '', window.location.pathname);
+    // Clean up OAuth hash/tokens from URL after Supabase has processed them
+    setTimeout(() => {
+      if(window.location.hash && window.location.hash.includes('access_token')) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }, 500);
   }
   if(event === 'SIGNED_OUT') {
     currentUser = null;
@@ -498,6 +508,12 @@ sb.auth.onAuthStateChange((event, session) => {
     document.getElementById('app').style.display  = 'none';
   }
 });
+
+// ── Check for existing session on page load ───────────────────────────────────
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if(session?.user) onLogin(session.user);
+})();
 
 // ── Finance logic ─────────────────────────────────────────────────────────────
 const FD_RATE    = 0.065;
